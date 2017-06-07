@@ -9,7 +9,7 @@
 * [create-react-app](https://github.com/facebookincubator/create-react-app)
 
 ## Commands:
-* `npm install` or `yarn` (can omit if generate this project using `sts-create`)
+* `npm install` or `yarn` (can omit if generate this project using [sts-create](https://github.com/stssoftware/sts-create))
 * `npm start`
 * `npm run build`
 
