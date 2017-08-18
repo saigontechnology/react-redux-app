@@ -49,7 +49,7 @@ FetchHelper.addAfterResonseInterceptor(resp => {
     //show error message
   }
 
-  if (resp instance of Error){
+  if (resp instanceof Error){
     //handle error. This is likely caused by the network connection.
   }
 })
