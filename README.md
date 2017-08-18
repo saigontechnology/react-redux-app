@@ -27,7 +27,7 @@ Developers must be familiar with:
   * /helpers: Helpers/Utility functions that would be used among modules
     * FetchHelper.js: A wrapper for Fetch API
   * /redux: All setup for Redux (reducers, store, middlewares)
-  * /modules: Each module is feature or re-used components
+  * /modules: Each module is a feature or re-used components
     * /common: A special module which contains many reused components among the app. Some components in here can be separate in to their own module if nessessary.
     * /module1: A module may relate to a feature. It contains many components, pages, actions, reducers, services, ... which are highly relate to each other.
       * index.js: All module items which are needed to be used from outside need to be export from here. From the outside, avoid to import module item directly.
@@ -48,6 +48,10 @@ FetchHelper.addAfterResonseInterceptor(resp => {
   if (resp.status === 500){
     //show error message
   }
+
+  if (resp instance of Error){
+    //handle error. This is likely caused by the network connection.
+  }
 })
 ```
 
@@ -65,6 +69,18 @@ FetchHelper.fetch(`${api_root}api/data.json`)
     //show error message
   }
 })
+```
+Or
+```js
+async function requestData(){
+  const [data, status] = await FetchHelper.fetch(`${api_root}api/data.json`)
+  if (status === 200){
+	//handle data	
+  }else{
+    //show error message
+  }
+}
+
 ```
 
 ### Post JSON data
