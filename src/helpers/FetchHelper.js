@@ -1,17 +1,33 @@
-import Logger from './Logger'
-import download from './download'
-
 /**
  *  Wrapper for Fetch API (https://developer.mozilla.org/en/docs/Web/API/Fetch_API)
  *  Inspired by Angular 1's $http service.
  *  Support setup default headers and interceptors.
  *  Future note: Consider using service worker instead of this for more standard solution.
- *  Usage (see each method below for more details):
- *      fetchHelperInstance.fetch( *the same parameters as Fetch API* )
- *      .then(...)
- *      .catch(...)
+ *  Example usage: 
+ *
+ *  import FetchHelper from './FetchHelper.js'
+ *  
+ *  // call this on app start:
+ *  FetchHelper.addAfterResonseInterceptor((response, jsonData) => {
+ *      if (response.status === 500){
+ *          //handle 500 error
+ *      }
+ *  })
+ *  
+ *  // call this to fetch data from server. `FetchHelper.fetch()` has the same parameters as Fetch API
+ *  FetchHelper.fetch(`http://your.api.root/data.json`)
+ *  .then(([data, status]) => {
+ *      if (status === 200){
+ *          //do something with data
+ *      }else{
+ *          //handle error  
+ *      }
+ *  })
  */
 class FetchHelper {
+    
+    FORM_URL_ENCODED = 'application/x-www-form-urlencoded';
+
     constructor() {
         this.defaultHeaders = {
             'Content-Type': 'application/json'
@@ -51,7 +67,7 @@ class FetchHelper {
      *  To define something to do after every fetch response.
      *  If one of interceptors returns false, the process will be stop immediately.
      *  Params:
-     *      interceptor: function (response)
+     *      interceptor: function (response, jsonData)
      *  Result:
      *      Returns a function to remove added interceptor.
      *  Future note: Consider using Service Worker
@@ -63,99 +79,49 @@ class FetchHelper {
             this.afterResponseInterceptors.splice(index, 1)
         }
     }
-
-    /**
-     *  Wrapper for fetch() API. Inspired by Angular's $http service.
-     *  Usage:
-     *      FetchHelper.fetch('api/something/somewhere', configs) //same parameters as Fetch API
-     *      .then(([data, status]) => {
-     *          //Handle when response status is in range [200, 300)
-     *          //Params:
-     *          //  data: json object
-     *          //  status: 2XX
-     *      }, ([data, status]) => {
-     *          //Handle when response status is not in rage [200, 300)
-     *          //Params:
-     *          //  data: json object
-     *          //  status: XXX or -1 if parse JSON fail from server response
-     *      })
-     */
-    fetch(input, init = {}) {
-        let initWithDefaultHeaders = {
-            ...init,
-            headers: mergeWithDefaultHeaders(init.headers, this.defaultHeaders)
-        }
-        applyBeforeRequestInterceptors(this.beforeRequestInterceptors)
-        return new Promise((resolve, reject) => {
-            let responseStatus
-            fetch.apply(null, [input, initWithDefaultHeaders])
-            .then(response => {
-                let interceptorsResult = applyAfterResponseInterceptors(response, this.afterResponseInterceptors)
-                if (interceptorsResult === false) {
-                    responseStatus = -1
-                    throw new Error('Fetch Promise was canceled by interceptor')
-                } else {
-                    // Do sth before resolve or reject to the outside:
-                    responseStatus = response.status;
-                    if (responseStatus >= 200 && responseStatus < 300) {
-                        return response.json()
-                    } else {
-                        throw response
-                    }
-                }
-            }).then(json => {
-                // Resolve json from server success response
-                resolve([json, responseStatus])
-
-            }).catch(response => {
-                if (response.json) {
-                    response.json().then(json => {
-                        // Reject json from server error response
-                        reject([json, responseStatus])
-                    }).catch(err => {
-                        reject([err, -1])
-                        Logger.log(err)
-                    })
-                } else {
-                    Logger.log(response)
-                    reject([response, -1])
-                }
-            })
-        })
+    jsonToForm(json = {}){
+        return Object.keys(json).map((key) => {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(json[key]);
+        }).join('&')
     }
-    //GET FILE
-    fetchFile(input, init = {}, fileName = 'rpt_Payroll', fileType = 'xls'){
+
+    async fetch(input, init = {}) {
         let initWithDefaultHeaders = {
             ...init,
             headers: mergeWithDefaultHeaders(init.headers, this.defaultHeaders)
         }
-        applyBeforeRequestInterceptors(this.beforeRequestInterceptors)
-        return new Promise((resolve, reject) => {
-            let responseStatus
-            fetch.apply(null, [input, initWithDefaultHeaders])
-                .then(response => {
-                    let interceptorsResult = applyAfterResponseInterceptors(response, this.afterResponseInterceptors)
-                    if (interceptorsResult === false) {
-                        responseStatus = -1
-                        throw new Error('Fetch Promise was canceled by interceptor')
-                    } else {
-                        // Do sth before resolve or reject to the outside:
-                        responseStatus = response.status;
-                        if (responseStatus >= 200 && responseStatus < 300) {
-                            return response.blob()
-                        } else {
-                            throw response
-                        }
-                    }
-                }).then(blob => {
-                    let file = fileName + "_" + getFormattedDate() + "." + fileType
-                    download(blob, file, "application/octet-stream")
-                    // Resolve json from server success response
-                    resolve([blob, responseStatus])
-                }, () => {
-                    reject([response, -1])
-                })
-        })
+        let beforeRequestInterceptorsResult = applyBeforeRequestInterceptors(this.beforeRequestInterceptors)
+        if (beforeRequestInterceptorsResult === false){
+            throw new Error('Fetch Promise was canceled by interceptor before requested')   
+        }
+        let response
+        try{
+            response = await fetch.apply(null, [input, initWithDefaultHeaders])
+        }catch(e){
+            console.error(e)
+            applyAfterResponseInterceptors(e, this.afterResponseInterceptors)
+            return [e, -1]
+        }
+
+        const responseStatus = response.status
+        let jsonData = null
+        try{
+            jsonData = await response.json()
+            let afterResponseInterceptorsResult = applyAfterResponseInterceptors(response, this.afterResponseInterceptors, jsonData)
+            if (afterResponseInterceptorsResult === false) {
+                throw new Error('Fetch Promise was canceled by interceptor after responded')
+            }
+            return [jsonData, responseStatus]
+        }catch(e){
+            if (!jsonData){
+                let afterResponseInterceptorsResult = applyAfterResponseInterceptors(response, this.afterResponseInterceptors, jsonData)
+                if (afterResponseInterceptorsResult === false) {
+                    throw new Error('Fetch Promise was canceled by interceptor after responded')
+                }   
+            }
+            console.warn(`Can not parse json from response of API "${input}" with code ${responseStatus}.`, e)
+            return [response, responseStatus]
+        }
     }
 
     getHeader(){
@@ -179,20 +145,36 @@ function mergeWithDefaultHeaders(headers = {}, defaultHeaders) {
 }
 
 function applyBeforeRequestInterceptors(interceptors) {
-    interceptors.forEach(interceptor => interceptor())
+    for (let interceptor of interceptors) {
+        try{
+            const interceptorResult = interceptor()
+            if (interceptorResult === false) {
+                console.error('Interceptor ', interceptor, ' has cancel signal. This makes the request stop immediately.')
+                return false
+            }    
+        }catch(e){
+            console.error(`[FetchHelper] Error from interceptor ${interceptor}`, e)
+            return false
+        }
+    }
+    //interceptors.forEach(interceptor => interceptor())
 }
 
-function applyAfterResponseInterceptors(response, interceptors) {
+function applyAfterResponseInterceptors(response, interceptors, jsonData) {
     for (let interceptor of interceptors) {
-        if (interceptor(response) === false) return false
+        try{
+            const interceptorResult = interceptor(response, jsonData)
+            if (interceptorResult === false) {
+                console.error('Interceptor ', interceptor, ' has cancel signal. This makes the request stop immediately.')
+                return false
+            }    
+        }catch(e){
+            console.error(`[FetchHelper] Error from interceptor ${interceptor}`, e)
+            return false
+        }
     }
 }
 
-function getFormattedDate() {
-    var d = new Date();
-    d = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2) + ('0' + d.getSeconds()).slice(-2);
-    return d;
-}
 
 const fetchHelperInstance = new FetchHelper()
 

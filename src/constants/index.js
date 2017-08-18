@@ -1,3 +1,1 @@
-export default {
-	api_root: 'http://your-api-root.com'
-}
+export const api_root = 'http://localhost:3000/'
