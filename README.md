@@ -75,7 +75,7 @@ Or
 async function requestData(){
   const [data, status] = await FetchHelper.fetch(`${api_root}api/data.json`)
   if (status === 200){
-	//handle data	
+    //handle data	
   }else{
     //show error message
   }
