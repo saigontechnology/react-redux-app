@@ -5,6 +5,15 @@ Your machine must already installed:
 * NodeJS
 * Yarn
 
+## IDE
+
+* Recommended: Visual Studio Code, Sublime Text
+* Recommended extensions for Visual Studio Code:
+  * Babel: https://marketplace.visualstudio.com/items?itemName=dzannotti.vscode-babel-coloring
+  * Prettier: https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode
+  * ESLint: https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint
+  * Path-autocomplete: https://marketplace.visualstudio.com/items?itemName=ionutvmi.path-autocomplete
+
 ## Techs and libs:
 Developers must be familiar with:
 * `react`
